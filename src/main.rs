@@ -13,7 +13,7 @@ fn main() {
     for i in 0..100 {
         let now = SystemTime::now();
         println!("Drawing shape number {:?}", i+1);
-        dest = add_best_shape(&dest, &src, 0.3);
+        dest = add_best_shape(&dest, &src);
         dest.save(format!("images/girl_iter3_step{:?}.jpg", i+1)).unwrap();
         println!("time for step: {:?}\n", now.elapsed());
     }
@@ -49,7 +49,7 @@ fn create_average_background_image(src: &image::DynamicImage) -> image::DynamicI
     dest
 }
 
-fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage, alpha: f32) -> image::DynamicImage {
+fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage) -> image::DynamicImage {
     // Hill climb algo scammed from wikipedia
     // Don't know what epsilon is though
     let image_width = src.dimensions().0 as usize;
@@ -59,7 +59,8 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage, alpha: f
     // TODO (03 Mar 2019 sam): step_sizes is hardocoded. Should ideally be dynamically created
     // and equal in length to current_shape, and possibly with different values based on
     // what is being optimised
-    let mut step_sizes = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
+    // NOTE (03 Mar 2019 sam): step_sizes[7] is alpha, which should be between 0.0 and 1.0
+    let mut step_sizes = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 0.5];
     let acceleration = 1.2;
     let candidates = [-acceleration, -1.0/acceleration, 0.0, 1.0/acceleration, acceleration];
     let mut current_shape = get_start_point(&img);
@@ -76,7 +77,7 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage, alpha: f
             for j in 0..candidates.len() {
                 let temp = (step_sizes[i] * candidates[j]) as i32;
                 current_shape[i] = current_shape[i] + temp;
-                let current_pixels = draw_shape(current_shape, &entry_pixels, alpha, image_width);
+                let current_pixels = draw_shape(current_shape, &entry_pixels, image_width);
                 let current_score = get_rmse(&current_pixels, &src_pixels);
                 current_shape[i] = current_shape[i] - (step_sizes[i] * candidates[j]) as i32;
                 if current_score < best_score {
@@ -97,13 +98,13 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage, alpha: f
             break;
         }
     }
-    let final_img = draw_shape(current_shape, &entry_pixels, alpha, image_width);
+    let final_img = draw_shape(current_shape, &entry_pixels, image_width);
     // NOTE(24 Feb 2019 sam): We might want to check the score here to make sure its improved
     // Currently it is assumed that it is improved
     vector_to_image(final_img, src)
 }
 
-fn get_start_point(img: &image::DynamicImage) -> [i32; 7] {
+fn get_start_point(img: &image::DynamicImage) -> [i32; 8] {
     // generate random start point
     let image_width = img.dimensions().0;
     let image_height = img.dimensions().1;
@@ -119,7 +120,8 @@ fn get_start_point(img: &image::DynamicImage) -> [i32; 7] {
     let red: i32 = rng.gen_range(0, 255);
     let green: i32 = rng.gen_range(0, 255);
     let blue: i32 = rng.gen_range(0, 255);
-    [x1, y1, x2, y2, red, green, blue]
+    let alpha : i32 = rng.gen_range(0, std::i32::MAX);
+    [x1, y1, x2, y2, red, green, blue, alpha]
 }
 
 fn compute_rmse(p1: [u8; 3], p2: [u8; 3]) -> f32 {
@@ -148,11 +150,11 @@ fn get_rmse(img1: &Vec<[u8; 3]>, img2: &Vec<[u8; 3]>) -> f32 {
                                    .zip(img2.iter())
                                    .map(|(p1, p2)| compute_rmse(*p1, *p2))
                                    .sum();
-    square_error /= (3.0 * img1.len() as f32);
+    square_error /= 3.0 * img1.len() as f32;
     square_error.powf(0.5)
 }
 
-fn draw_shape(shape: [i32;7], img: &Vec<[u8; 3]>, alpha: f32, image_width: usize) -> Vec<[u8; 3]> {
+fn draw_shape(shape: [i32;8], img: &Vec<[u8; 3]>, image_width: usize) -> Vec<[u8; 3]> {
     let mut new_pixels = img.clone();
     let image_height = img.len() / image_width;
 
@@ -163,6 +165,7 @@ fn draw_shape(shape: [i32;7], img: &Vec<[u8; 3]>, alpha: f32, image_width: usize
     let red = shape[4] as u8;
     let green = shape[5] as u8;
     let blue = shape[6] as u8;
+    let alpha = shape[7] as f32 / std::i32::MAX as f32;
     // contstraining shape
     if maxx >= image_width { maxx = image_width-1; }
     if maxy >= image_height { maxy = image_height-1; }
