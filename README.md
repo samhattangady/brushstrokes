@@ -8,10 +8,9 @@ It has been inspired by the [work of fogleman's primitive](https://github.com/fo
 Currently very early stages. Results ain't great. Very slow. And lots of hardcoding. ¯\\\_(ツ)\_/¯
 
 Improvements:
-1. Create output in colour.
-2. Use multiple threads.
-3. Improve efficiency overall.
-4. Add support for triangles, circles, etc.
-5. Use multiple starting points for hill-climb.
-6. Try out other optimisation algorithms.
-7. Add command line arguments, and other usability improvements.
+1. Use multiple threads.
+2. Improve efficiency overall.
+3. Add support for triangles, circles, etc.
+4. Use multiple starting points for hill-climb.
+5. Try out other optimisation algorithms.
+6. Add command line arguments, and other usability improvements.
