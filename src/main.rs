@@ -1,8 +1,10 @@
 extern crate image;
 extern crate rand;
+extern crate rayon;
 
 use image::{GenericImage, GenericImageView};
 use rand::prelude::*;
+use rayon::prelude::*;
 use std::time::{SystemTime};
 
 fn main() {
@@ -65,6 +67,7 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage, alpha: f
     let mut step_score;
 
     for _ in 0..100 {
+        // let now = SystemTime::now();
         step_score = best_score;
         best_score = std::i32::MAX as f32;
         for i in 0..current_shape.len() {
@@ -88,6 +91,7 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage, alpha: f
                 step_sizes[i] = step_sizes[i] * candidates[best];
             }
         }
+        // println!("computing for best shape took : {:?}\n", now.elapsed());
         // TODO (24 Feb 2019 sam) Figure out what this epsilon value is supposed to be
         if (step_score - best_score) < 0.000005 {
             break;
@@ -121,7 +125,7 @@ fn get_start_point(img: &image::DynamicImage) -> [i32; 7] {
 fn compute_rmse(p1: [u8; 3], p2: [u8; 3]) -> f32 {
     // TODO (24 Feb 2019 sam) See how this can be cleaned up
     // let (p1, p2) = pixels;
-    square_error = 0.0;
+    let mut square_error = 0.0;
     let r1 = p1[0] as f32;
     let g1 = p1[1] as f32;
     let b1 = p1[2] as f32;
@@ -135,11 +139,16 @@ fn compute_rmse(p1: [u8; 3], p2: [u8; 3]) -> f32 {
 }
 
 fn get_rmse(img1: &Vec<[u8; 3]>, img2: &Vec<[u8; 3]>) -> f32 {
-    let square_error = img1.iter()
-                           .zip(img2.iter())
-                           .map(|p1, p2| compute_rmse(p1, p2))
-                           .sum();
-    square_error /= (4 * img1.len() as f32);
+    // FIXME: (03 Mar 2019 sam): par_iter is slower than iter. See why that could be
+    // let mut square_error:f32 = img1.par_iter()
+    //                                .zip(img2.par_iter())
+    //                                .map(|(p1, p2)| compute_rmse(*p1, *p2))
+    //                                .sum();
+    let mut square_error:f32 = img1.iter()
+                                   .zip(img2.iter())
+                                   .map(|(p1, p2)| compute_rmse(*p1, *p2))
+                                   .sum();
+    square_error /= (3.0 * img1.len() as f32);
     square_error.powf(0.5)
 }
 
