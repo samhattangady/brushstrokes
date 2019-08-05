@@ -3,7 +3,7 @@
 Brushstrokes is a project to convert images into simpler geometric shapes.
 It has been inspired by the [work of fogleman's primitive](https://github.com/fogleman/primitive/), and has been implemented in rust.
 
-<img src='https://raw.githubusercontent.com/samhattangady/brushstrokes/master/docs/original_clr.jpg?sanitize=true&raw=true' /> <img src='https://raw.githubusercontent.com/samhattangady/brushstrokes/master/docs/brushstroke_clr.jpg?sanitize=true&raw=true' />
+<img src='https://imgur.com/CyPrzrc' /> <img src='https://imgur.com/QMbBaC5' />
 
 Currently very early stages. Results ain't great. Very slow. And lots of hardcoding. ¯\\\_(ツ)\_/¯
 
