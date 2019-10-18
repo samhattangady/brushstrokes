@@ -8,15 +8,55 @@ use rayon::prelude::*;
 use std::time::{SystemTime};
 
 fn main() {
-    let src = image::open("images/girl_with_pearl.jpg").unwrap();
+    let now1 = SystemTime::now();
+    let factor = 5;
+    let mut src = image::open("images/calvin.jpg").unwrap();
+    println!("time for opening image: {:?}\n", now1.elapsed());
+    src = shrink_image(&src, factor);
     let mut dest = create_average_background_image(&src);
-    for i in 0..100 {
+    for i in 0..1000 {
         let now = SystemTime::now();
         println!("Drawing shape number {:?}", i+1);
         dest = add_best_shape(&dest, &src);
-        dest.save(format!("images/girl_iter3_step{:?}.jpg", i+1)).unwrap();
+        if i % 100 == 0 {
+            blow_up_image(&dest, factor).save(format!("images/peace_{:?}.jpg", i+1)).unwrap();
+        }
         println!("time for step: {:?}\n", now.elapsed());
     }
+}
+
+fn shrink_image(src: &image::DynamicImage, factor: u32) -> image::DynamicImage {
+    let now = SystemTime::now();
+    let dim = src.dimensions();
+    let image_width = dim.0;
+    let image_height = dim.1;
+    let mut dest = image::DynamicImage::new_rgb8(image_width/factor, image_height/factor);
+    for x in 0..image_width/factor {
+        for y in 0..image_height/factor {
+            let pixel = src.get_pixel(x*factor, y*factor);
+            dest.put_pixel(x, y, pixel);
+        }
+    }
+    println!("time for shrinking image: {:?}\n", now.elapsed());
+    dest
+}
+
+fn blow_up_image(src: &image::DynamicImage, factor: u32) -> image::DynamicImage {
+    let dim = src.dimensions();
+    let image_width = dim.0;
+    let image_height = dim.1;
+    let mut dest = image::DynamicImage::new_rgb8(image_width*factor, image_height*factor);
+    for x in 0..image_width {
+        for y in 0..image_height {
+            let pixel = src.get_pixel(x, y);
+            for i in 0..factor {
+                for j in 0..factor {
+                    dest.put_pixel((x*factor)+i, (y*factor)+j, pixel);
+                }
+            }
+        }
+    }
+    dest
 }
 
 fn create_average_background_image(src: &image::DynamicImage) -> image::DynamicImage {
@@ -59,16 +99,15 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage) -> image
     // TODO (03 Mar 2019 sam): step_sizes is hardocoded. Should ideally be dynamically created
     // and equal in length to current_shape, and possibly with different values based on
     // what is being optimised
-    // NOTE (03 Mar 2019 sam): step_sizes[7] is alpha, which should be between 0.0 and 1.0
-    let mut step_sizes = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 0.5];
+    let mut step_sizes = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
     let acceleration = 1.2;
     let candidates = [-acceleration, -1.0/acceleration, 0.0, 1.0/acceleration, acceleration];
     let mut current_shape = get_start_point(&img);
     let mut best_score = std::i32::MAX as f32;
     let mut step_score;
 
-    for _ in 0..100 {
-        // let now = SystemTime::now();
+    for n in 0..100 {
+        let now = SystemTime::now();
         step_score = best_score;
         best_score = std::i32::MAX as f32;
         for i in 0..current_shape.len() {
@@ -92,7 +131,7 @@ fn add_best_shape(img: &image::DynamicImage, src: &image::DynamicImage) -> image
                 step_sizes[i] = step_sizes[i] * candidates[best];
             }
         }
-        // println!("computing for best shape took : {:?}\n", now.elapsed());
+        // println!("computing for best iter {:?} shape took : {:?}\n", n, now.elapsed());
         // TODO (24 Feb 2019 sam) Figure out what this epsilon value is supposed to be
         if (step_score - best_score) < 0.000005 {
             break;
@@ -120,7 +159,7 @@ fn get_start_point(img: &image::DynamicImage) -> [i32; 8] {
     let red: i32 = rng.gen_range(0, 255);
     let green: i32 = rng.gen_range(0, 255);
     let blue: i32 = rng.gen_range(0, 255);
-    let alpha : i32 = rng.gen_range(0, std::i32::MAX);
+    let alpha : i32 = rng.gen_range(0, 100);
     [x1, y1, x2, y2, red, green, blue, alpha]
 }
 
@@ -142,19 +181,21 @@ fn compute_rmse(p1: [u8; 3], p2: [u8; 3]) -> f32 {
 
 fn get_rmse(img1: &Vec<[u8; 3]>, img2: &Vec<[u8; 3]>) -> f32 {
     // FIXME: (03 Mar 2019 sam): par_iter is slower than iter. See why that could be
-    // let mut square_error:f32 = img1.par_iter()
-    //                                .zip(img2.par_iter())
-    //                                .map(|(p1, p2)| compute_rmse(*p1, *p2))
-    //                                .sum();
+    // par_iter takes ~52ms, while regular takes ~37ms. These times were taken on the
+    // regular build. Same holds true for the release build as well, with the times
+    // being a little different
+    let now = SystemTime::now();
     let mut square_error:f32 = img1.iter()
                                    .zip(img2.iter())
                                    .map(|(p1, p2)| compute_rmse(*p1, *p2))
                                    .sum();
     square_error /= 3.0 * img1.len() as f32;
+    // println!("computing rmse took : {:?}\n", now.elapsed());
     square_error.powf(0.5)
 }
 
 fn draw_shape(shape: [i32;8], img: &Vec<[u8; 3]>, image_width: usize) -> Vec<[u8; 3]> {
+    let now = SystemTime::now();
     let mut new_pixels = img.clone();
     let image_height = img.len() / image_width;
 
@@ -165,7 +206,7 @@ fn draw_shape(shape: [i32;8], img: &Vec<[u8; 3]>, image_width: usize) -> Vec<[u8
     let red = shape[4] as u8;
     let green = shape[5] as u8;
     let blue = shape[6] as u8;
-    let alpha = shape[7] as f32 / std::i32::MAX as f32;
+    let alpha = shape[7] as f32 / 100.0;
     // contstraining shape
     if maxx >= image_width { maxx = image_width-1; }
     if maxy >= image_height { maxy = image_height-1; }
@@ -182,6 +223,7 @@ fn draw_shape(shape: [i32;8], img: &Vec<[u8; 3]>, image_width: usize) -> Vec<[u8
             new_pixels[y as usize*image_width + x] = [new_red, new_green, new_blue];
         }
     }
+    // println!("drawing shape took : {:?}\n", now.elapsed());
     new_pixels
 }
 
